@@ -1,0 +1,78 @@
+/* Global styles for the product photo enhancer */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'Tajawal', sans-serif;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  min-height: 100vh;
+}
+
+#root {
+  width: 100%;
+  min-height: 100vh;
+}
+
+/* Ensure proper RTL support */
+[dir="rtl"] {
+  text-align: right;
+}
+
+/* Loading spinner styles */
+.spinner {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #667eea;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #5a67d8;
+}
+
+/* Responsive image handling */
+img {
+  max-width: 100%;
+  height: auto;
+}
+
+/* Button focus styles */
+button:focus {
+  outline: 2px solid #667eea;
+  outline-offset: 2px;
+}
+
+/* File input styling */
+input[type="file"] {
+  width: 100%;
+}
+
+/* Drag and drop area styling */
+.drag-area {
+  transition: all 0.3s ease;
+}
+
+.drag-area.drag-over {
+  background-color: rgba(102, 126, 234, 0.1);
+  border-color: #667eea;
+}
