@@ -41,11 +41,13 @@ export const EnhancerView: React.FC = () => {
       try {
         const productImageData = await fileToBase64(productImage);
         let finalBase64Image: string | null = null;
+        let responseMessage: string | null = null;
         
         if (styleReferenceImage) {
           const styleReferenceImageData = await fileToBase64(styleReferenceImage);
-          const { base64Image } = await applyStyleFromReference(productImageData, styleReferenceImageData);
-          finalBase64Image = base64Image;
+          const result = await applyStyleFromReference(productImageData, styleReferenceImageData);
+          finalBase64Image = result.base64Image;
+          responseMessage = result.message;
         } else if (isReusingBackground && reusableBackground) {
           const parts = reusableBackground.split(',');
           const mimeTypeMatch = parts[0].match(/:(.*?);/);
@@ -54,11 +56,13 @@ export const EnhancerView: React.FC = () => {
           }
           const styleReferenceData = { base64: parts[1], mimeType: mimeTypeMatch[1] };
           
-          const { base64Image } = await applyStyleFromReference(productImageData, styleReferenceData);
-          finalBase64Image = base64Image;
+          const result = await applyStyleFromReference(productImageData, styleReferenceData);
+          finalBase64Image = result.base64Image;
+          responseMessage = result.message;
         } else {
-          const { finalImage } = await enhanceImage(productImageData);
-          finalBase64Image = finalImage;
+          const result = await enhanceImage(productImageData);
+          finalBase64Image = result.finalImage;
+          responseMessage = result.message;
         }
   
         if (finalBase64Image) {
@@ -71,7 +75,9 @@ export const EnhancerView: React.FC = () => {
           
           setProcessingState(ProcessingState.Success);
         } else {
-          throw new Error(t('error_no_image_from_ai'));
+          const errorMessage = responseMessage || t('error_no_image_from_ai');
+          setError(errorMessage);
+          setProcessingState(ProcessingState.Error);
         }
   
       } catch (err) {
@@ -95,14 +101,15 @@ export const EnhancerView: React.FC = () => {
           }
           const currentImage = { base64: parts[1], mimeType: mimeTypeMatch[1] };
   
-          const { upscaledImage: upscaledImageData } = await upscaleImage(currentImage);
+          const result = await upscaleImage(currentImage);
   
-          if (upscaledImageData) {
-              const newImageSrc = `data:${currentImage.mimeType};base64,${upscaledImageData}`;
+          if (result.upscaledImage) {
+              const newImageSrc = `data:${currentImage.mimeType};base64,${result.upscaledImage}`;
               setResultImage(newImageSrc);
               setIsUpscaled(true);
           } else {
-              throw new Error(t('error_no_upscaled_image_from_ai'));
+              const errorMessage = result.message || t('error_no_upscaled_image_from_ai');
+              setError(errorMessage);
           }
       } catch (err) {
           console.error(err);
