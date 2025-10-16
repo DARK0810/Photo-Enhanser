@@ -33,60 +33,94 @@ function handleApiError(error: any): { finalImage: string | null; text: string }
 
 /**
  * Generates a single enhanced image from a product photo.
+ * Includes retry logic for text-only responses.
  */
 export async function enhanceImage(
-  productImage: { base64: string; mimeType: string }
-): Promise<{ finalImage: string | null; text: string | null }> {
+  productImage: { base64: string; mimeType: string },
+  maxRetries: number = 3,
+  onRetry?: (attempt: number, maxRetries: number) => void
+): Promise<{ finalImage: string | null; text: string | null; retries: number }> {
   
-  try {
-    const productPart = {
-      inlineData: {
-        data: productImage.base64,
-        mimeType: productImage.mimeType,
-      },
-    };
+  const productPart = {
+    inlineData: {
+      data: productImage.base64,
+      mimeType: productImage.mimeType,
+    },
+  };
 
-    const textPrompt = `
-      You are an expert AI photo editor specializing in product photography. Your primary goal is to create a stunning, social-media-ready image from a user-submitted product photo.
+  const textPrompt = `
+    You are an expert AI photo editor specializing in product photography. Your primary goal is to create a stunning, social-media-ready image from a user-submitted product photo.
 
-      **GOLDEN RULE: The product in the image MUST remain completely untouched. Do NOT modify, alter, edit, enhance, or change the product itself in any way. This is especially true for any intricate details, designs, or text (like the Arabic calligraphy) on the product. Preserve the product perfectly.**
+    **GOLDEN RULE: The product in the image MUST remain completely untouched. Do NOT modify, alter, edit, enhance, or change the product itself in any way. This is especially true for any intricate details, designs, or text (like the Arabic calligraphy) on the product. Preserve the product perfectly.**
 
-      Follow these steps precisely:
-      1.  **Identify and Isolate:** Perfectly identify the product and separate it from its original background.
-      2.  **Create Background:** Generate a new, elegant, and professional background that complements the product. Good themes are minimal, soft-focus, or event-themed (like a wedding).
-      3.  **Place Product:** Place the original, completely unaltered product onto the new background.
-      4.  **Adjust Global Lighting:** Make subtle adjustments to the overall lighting and shadows to ensure the product looks natural on the new background. This should not change the product's own colors or details.
+    Follow these steps precisely:
+    1.  **Identify and Isolate:** Perfectly identify the product and separate it from its original background.
+    2.  **Create Background:** Generate a new, elegant, and professional background that complements the product. Good themes are minimal, soft-focus, or event-themed (like a wedding).
+    3.  **Place Product:** Place the original, completely unaltered product onto the new background.
+    4.  **Adjust Global Lighting:** Make subtle adjustments to the overall lighting and shadows to ensure the product looks natural on the new background. This should not change the product's own colors or details.
+    
+    **CRITICAL OUTPUT INSTRUCTIONS:**
+    You MUST return only ONE image part in your response: The final, completed image of the product on its new background, in a square (1:1) aspect ratio.
+  `;
+  
+  const parts = [productPart, { text: textPrompt }];
+
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    try {
+      const response: GenerateContentResponse = await ai.models.generateContent({
+        model: 'gemini-2.5-flash-image-preview',
+        contents: { parts },
+        config: {
+          responseModalities: [Modality.IMAGE, Modality.TEXT],
+        },
+      });
       
-      **CRITICAL OUTPUT INSTRUCTIONS:**
-      You MUST return only ONE image part in your response: The final, completed image of the product on its new background, in a square (1:1) aspect ratio.
-    `;
-    
-    const parts = [productPart, { text: textPrompt }];
-
-    const response: GenerateContentResponse = await ai.models.generateContent({
-      model: 'gemini-2.5-flash-image-preview',
-      contents: { parts },
-      config: {
-        responseModalities: [Modality.IMAGE, Modality.TEXT],
-      },
-    });
-    
-    let finalImage: string | null = null;
-    let text: string | null = null;
-    
-    for (const part of response.candidates[0].content.parts) {
-      if (part.inlineData?.data) {
-        finalImage = part.inlineData.data;
-        break; // Found the first image, that's all we need.
-      } else if (part.text) {
-        text = part.text;
+      let finalImage: string | null = null;
+      let text: string | null = null;
+      
+      for (const part of response.candidates[0].content.parts) {
+        if (part.inlineData?.data) {
+          finalImage = part.inlineData.data;
+          break; // Found the first image, that's all we need.
+        } else if (part.text) {
+          text = part.text;
+        }
       }
-    }
 
-    return { finalImage, text };
-  } catch (error) {
-    return handleApiError(error);
+      // If we got an image, return success
+      if (finalImage) {
+        return { finalImage, text, retries: attempt };
+      }
+
+      // If we only got text and haven't exhausted retries, try again
+      if (attempt < maxRetries - 1) {
+        if (onRetry) {
+          onRetry(attempt + 1, maxRetries);
+        }
+        // Add a small delay before retrying
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        continue;
+      }
+
+      // Last attempt failed - return text-only response
+      return { finalImage: null, text, retries: attempt + 1 };
+    } catch (error) {
+      // On error, if we have retries left, try again
+      if (attempt < maxRetries - 1) {
+        if (onRetry) {
+          onRetry(attempt + 1, maxRetries);
+        }
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        continue;
+      }
+      // Last attempt failed with error
+      const errorResult = handleApiError(error);
+      return { ...errorResult, retries: attempt + 1 };
+    }
   }
+
+  // Should never reach here, but for TypeScript
+  return { finalImage: null, text: null, retries: maxRetries };
 }
 
 

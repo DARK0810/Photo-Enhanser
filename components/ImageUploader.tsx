@@ -81,9 +81,10 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({ title, onFileSelec
         onDragLeave={handleDragLeave}
         onDragOver={handleDragOver}
         onDrop={handleDrop}
+        aria-label={title}
       >
         {preview ? (
-          <img src={preview} alt="Preview" className="object-contain w-full h-full p-2 rounded-lg" />
+          <img src={preview} alt={`${title} - Preview`} className="object-contain w-full h-full p-2 rounded-lg" />
         ) : (
           <div className="flex flex-col items-center justify-center pt-5 pb-6 text-gray-500">
             {isStyleReference ? <StyleIcon /> : <UploadIcon />}
@@ -100,6 +101,7 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({ title, onFileSelec
           accept="image/*"
           onChange={(e) => handleFileChange(e.target.files)}
           disabled={disabled}
+          aria-label={title}
         />
       </label>
     </div>
